@@ -14,6 +14,8 @@ export default function ClinicalLens() {
   const [flashActive, setFlashActive] = useState(false);
   const [facingMode, setFacingMode] = useState('environment');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [cameraIndex, setCameraIndex] = useState(0);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -25,6 +27,7 @@ export default function ClinicalLens() {
     if (typeof navigator !== 'undefined' && navigator.mediaDevices?.enumerateDevices) {
       navigator.mediaDevices.enumerateDevices().then(devices => {
         const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        setAvailableCameras(videoDevices);
         setHasMultipleCameras(videoDevices.length > 1);
       }).catch(() => {});
     }
@@ -41,18 +44,44 @@ export default function ClinicalLens() {
     }
   }, []);
 
-  const startCamera = useCallback(async (preferredFacing) => {
+  const startCamera = useCallback(async (preferredFacingOrId) => {
     stopStream();
-    const facing = preferredFacing || facingMode;
+    
+    let videoConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    
+    if (preferredFacingOrId && preferredFacingOrId !== 'user' && preferredFacingOrId !== 'environment') {
+      videoConstraints.deviceId = { exact: preferredFacingOrId };
+    } else {
+      const facing = preferredFacingOrId || facingMode;
+      videoConstraints.facingMode = facing;
+    }
+
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: videoConstraints,
         audio: false,
       });
       streamRef.current = s;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
         videoRef.current.onloadedmetadata = () => videoRef.current.play();
+      }
+      // Re-evaluate available cameras after permission
+      if (navigator.mediaDevices?.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+          const videoDevices = devices.filter(d => d.kind === 'videoinput');
+          setAvailableCameras(videoDevices);
+          setHasMultipleCameras(videoDevices.length > 1);
+          
+          if (s.getVideoTracks().length > 0) {
+             const track = s.getVideoTracks()[0];
+             const settings = track.getSettings();
+             if (settings.deviceId) {
+               const idx = videoDevices.findIndex(d => d.deviceId === settings.deviceId);
+               if (idx !== -1) setCameraIndex(idx);
+             }
+          }
+        }).catch(() => {});
       }
     } catch {
       // Fallback to any available camera
@@ -62,6 +91,22 @@ export default function ClinicalLens() {
         if (videoRef.current) {
           videoRef.current.srcObject = s;
           videoRef.current.onloadedmetadata = () => videoRef.current.play();
+        }
+        if (navigator.mediaDevices?.enumerateDevices) {
+          navigator.mediaDevices.enumerateDevices().then(devices => {
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            setAvailableCameras(videoDevices);
+            setHasMultipleCameras(videoDevices.length > 1);
+            
+            if (s.getVideoTracks().length > 0) {
+               const track = s.getVideoTracks()[0];
+               const settings = track.getSettings();
+               if (settings.deviceId) {
+                 const idx = videoDevices.findIndex(d => d.deviceId === settings.deviceId);
+                 if (idx !== -1) setCameraIndex(idx);
+               }
+            }
+          }).catch(() => {});
         }
       } catch {
         alert('Camera access required. Please allow camera permissions.');
@@ -100,6 +145,15 @@ export default function ClinicalLens() {
   }
 
   function switchCamera() {
+    if (availableCameras.length > 1) {
+      const nextIdx = (cameraIndex + 1) % availableCameras.length;
+      setCameraIndex(nextIdx);
+      const nextDevice = availableCameras[nextIdx];
+      if (nextDevice && nextDevice.deviceId) {
+        startCamera(nextDevice.deviceId);
+        return;
+      }
+    }
     const next = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(next);
     startCamera(next);
