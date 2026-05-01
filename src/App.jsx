@@ -175,9 +175,11 @@ export default function ClinicalLens() {
       speakText(`Live Assistant active. Preparing for ${view.name}.`);
       
       // Prototype Smart Framing Sequence
-      autoFramingTimeouts.current.push(setTimeout(() => speakText('Please move a little back.'), 4500));
-      autoFramingTimeouts.current.push(setTimeout(() => speakText('Slightly up.'), 8000));
-      autoFramingTimeouts.current.push(setTimeout(() => speakText("Stop it, it's perfect. Keep this angle for scan."), 11500));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText('Move a little back.'), 4500));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText('A little front.'), 7500));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText('Up.'), 10000));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText('Down.'), 12000));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText("Stop it, it's perfect. Keep this angle for scan."), 14500));
     }, 400);
   }
 
