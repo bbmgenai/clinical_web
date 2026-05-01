@@ -6,59 +6,45 @@ export default function ClinicalLens() {
   const [screen, setScreen] = useState('splash');
   const [currentView, setCurrentView] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
-  const [showInstructions, setShowInstructions] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
   const [completedViews, setCompletedViews] = useState([]);
-  const [capturedDataURL, setCapturedDataURL] = useState(null);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [flashActive, setFlashActive] = useState(false);
-  const [speechEnabled, setSpeechEnabled] = useState(true);
-  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const [facingMode, setFacingMode] = useState('environment');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   const [availableCameras, setAvailableCameras] = useState([]);
   const [cameraIndex, setCameraIndex] = useState(0);
+  const [distances, setDistances] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('clinical_distances')) || {}; } catch { return {}; }
+  });
+  const [aspectMode, setAspectMode] = useState('3:2');
+  const [capturedPhotos, setCapturedPhotos] = useState([]);
+  const [captureStep, setCaptureStep] = useState(0);
+  const [isAligned, setIsAligned] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const animFrameRef = useRef(null);
-  const autoFramingTimeouts = useRef([]);
 
-  // Detect available cameras on mount
+  function updateDistance(id, val) {
+    setDistances(prev => {
+      const next = { ...prev, [id]: val };
+      localStorage.setItem('clinical_distances', JSON.stringify(next));
+      return next;
+    });
+  }
+
+  // Detect cameras on mount (pre-permission — labels may be empty until granted)
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.enumerateDevices) {
+    if (navigator.mediaDevices?.enumerateDevices) {
       navigator.mediaDevices.enumerateDevices().then(devices => {
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        setAvailableCameras(videoDevices);
-        setHasMultipleCameras(videoDevices.length > 1);
+        const cams = devices.filter(d => d.kind === 'videoinput');
+        setAvailableCameras(cams);
+        setHasMultipleCameras(cams.length > 1);
       }).catch(() => {});
     }
-    // Pre-load voices
-    if (synth) synth.getVoices();
-  }, [synth]);
-
-  const speakText = useCallback((text) => {
-    if (!speechEnabled || !synth) return;
-    synth.cancel(); // Stop current speech
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voices = synth.getVoices();
-    let voice = voices.find(v => 
-      v.name.includes('Samantha') || 
-      v.name.includes('Zira') || 
-      v.name.includes('Google UK English Female') || 
-      v.name.includes('Female')
-    );
-    if (!voice) voice = voices.find(v => v.name.includes('Google US English') || v.lang.includes('en'));
-    if (voice) utterance.voice = voice;
-    utterance.rate = 0.95;
-    utterance.pitch = 1.1; // Sweeter pitch
-    synth.speak(utterance);
-  }, [speechEnabled, synth]);
-
-  const clearFramingTimeouts = useCallback(() => {
-    autoFramingTimeouts.current.forEach(clearTimeout);
-    autoFramingTimeouts.current = [];
   }, []);
 
   const stopStream = useCallback(() => {
@@ -74,94 +60,75 @@ export default function ClinicalLens() {
 
   const startCamera = useCallback(async (preferredFacingOrId) => {
     stopStream();
-    
-    let videoConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 } };
-    
+
+    // Proactively enumerate to catch external webcams
+    let videoDevices = [];
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      videoDevices = devices.filter(d => d.kind === 'videoinput');
+      setAvailableCameras(videoDevices);
+      setHasMultipleCameras(videoDevices.length > 1);
+    } catch { /* ignore */ }
+
+    const videoConstraints = {
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      frameRate: { ideal: 30 },
+    };
+
     if (preferredFacingOrId && preferredFacingOrId !== 'user' && preferredFacingOrId !== 'environment') {
       videoConstraints.deviceId = { exact: preferredFacingOrId };
     } else {
-      const facing = preferredFacingOrId || facingMode;
-      videoConstraints.facingMode = facing;
+      videoConstraints.facingMode = { ideal: preferredFacingOrId || facingMode };
     }
 
     try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: false,
-      });
+      const s = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
       streamRef.current = s;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
-        videoRef.current.onloadedmetadata = () => videoRef.current.play();
+        videoRef.current.onloadedmetadata = () => videoRef.current?.play();
       }
-      // Re-evaluate available cameras after permission
-      if (navigator.mediaDevices?.enumerateDevices) {
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-          const videoDevices = devices.filter(d => d.kind === 'videoinput');
-          setAvailableCameras(videoDevices);
-          setHasMultipleCameras(videoDevices.length > 1);
-          
-          if (s.getVideoTracks().length > 0) {
-             const track = s.getVideoTracks()[0];
-             const settings = track.getSettings();
-             if (settings.deviceId) {
-               const idx = videoDevices.findIndex(d => d.deviceId === settings.deviceId);
-               if (idx !== -1) setCameraIndex(idx);
-             }
-          }
-        }).catch(() => {});
+      // Sync cameraIndex
+      if (s.getVideoTracks().length > 0 && videoDevices.length > 0) {
+        const settings = s.getVideoTracks()[0].getSettings();
+        const idx = videoDevices.findIndex(d => d.deviceId === settings.deviceId);
+        if (idx !== -1) setCameraIndex(idx);
       }
-    } catch {
-      // Fallback to any available camera
+    } catch (err) {
+      console.warn('Camera constraint failed, trying fallback:', err.message);
       try {
         const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         streamRef.current = s;
         if (videoRef.current) {
           videoRef.current.srcObject = s;
-          videoRef.current.onloadedmetadata = () => videoRef.current.play();
-        }
-        if (navigator.mediaDevices?.enumerateDevices) {
-          navigator.mediaDevices.enumerateDevices().then(devices => {
-            const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            setAvailableCameras(videoDevices);
-            setHasMultipleCameras(videoDevices.length > 1);
-            
-            if (s.getVideoTracks().length > 0) {
-               const track = s.getVideoTracks()[0];
-               const settings = track.getSettings();
-               if (settings.deviceId) {
-                 const idx = videoDevices.findIndex(d => d.deviceId === settings.deviceId);
-                 if (idx !== -1) setCameraIndex(idx);
-               }
-            }
-          }).catch(() => {});
+          videoRef.current.onloadedmetadata = () => videoRef.current?.play();
         }
       } catch {
-        alert('Camera access required. Please allow camera permissions.');
+        alert('Camera access required. Please allow camera permissions in your browser settings.');
       }
     }
   }, [facingMode, stopStream]);
 
-  // Canvas overlay draw loop
+  // ── Canvas overlay draw loop ── must include isAligned in deps
   useEffect(() => {
     if (screen !== 'camera' || !currentView) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     let running = true;
+
     function loop() {
       if (!running) return;
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawOverlay(currentView.id, ctx, canvas.width, canvas.height);
+      drawOverlay(currentView.id, ctx, canvas.width, canvas.height, aspectMode, isAligned);
       animFrameRef.current = requestAnimationFrame(loop);
     }
     loop();
     return () => { running = false; cancelAnimationFrame(animFrameRef.current); };
-  }, [screen, currentView]);
-
-  function showScreen(id) { setScreen(id); }
+  }, [screen, currentView, aspectMode, isAligned]); // ← isAligned MUST be here
 
   function startView(viewId) {
     const view = VIEWS.find(v => v.id === viewId);
@@ -169,91 +136,82 @@ export default function ClinicalLens() {
     setCurrentStep(0);
     setShowInstructions(true);
     setScreen('camera');
-    clearFramingTimeouts();
-    setTimeout(() => {
-      startCamera();
-      speakText(`Live Assistant active. Preparing for ${view.name}.`);
-      
-      // Prototype Smart Framing Sequence
-      autoFramingTimeouts.current.push(setTimeout(() => speakText('Move a little back.'), 4500));
-      autoFramingTimeouts.current.push(setTimeout(() => speakText('A little front.'), 7500));
-      autoFramingTimeouts.current.push(setTimeout(() => speakText('Up.'), 10000));
-      autoFramingTimeouts.current.push(setTimeout(() => speakText('Down.'), 12000));
-      autoFramingTimeouts.current.push(setTimeout(() => speakText("Stop it, it's perfect. Keep this angle for scan."), 14500));
-    }, 400);
+    setCapturedPhotos([]);
+    setCaptureStep(0);
+    setIsAligned(false);
+    setTimeout(() => startCamera(), 100);
   }
 
-  function switchCamera() {
+  async function switchCamera() {
+    stopStream();
+    await new Promise(r => setTimeout(r, 120)); // hardware release delay
+
     if (availableCameras.length > 1) {
       const nextIdx = (cameraIndex + 1) % availableCameras.length;
-      setCameraIndex(nextIdx);
-      const nextDevice = availableCameras[nextIdx];
-      if (nextDevice && nextDevice.deviceId) {
-        startCamera(nextDevice.deviceId);
-        return;
-      }
+      const next = availableCameras[nextIdx];
+      if (next?.deviceId) { startCamera(next.deviceId); return; }
     }
     const next = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(next);
     startCamera(next);
   }
 
-  function closeCamera() {
-    stopStream();
-    clearFramingTimeouts();
-    if (synth) synth.cancel();
-    setScreen('selector');
-  }
-
-  function toggleInstructions() {
-    setShowInstructions(prev => !prev);
-  }
-
+  function closeCamera() { stopStream(); setScreen('selector'); }
+  function toggleInstructions() { setShowInstructions(p => !p); }
   function nextStep() {
     if (!currentView) return;
-    const next = (currentStep + 1) % currentView.steps.length;
-    setCurrentStep(next);
-    if (!showInstructions) setShowInstructions(true);
-    speakText(`Step ${next + 1}. ${currentView.steps[next]}`);
+    setCurrentStep(p => (p + 1) % currentView.steps.length);
+    setShowInstructions(true);
   }
 
   function capturePhoto() {
     const video = videoRef.current;
-    if (!video) return;
-    clearFramingTimeouts();
-    if (synth) synth.cancel();
+    if (!video || video.videoWidth === 0) return;
+
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 80);
+
     const oc = document.createElement('canvas');
-    oc.width = video.videoWidth || 1280;
-    oc.height = video.videoHeight || 720;
+    oc.width = video.videoWidth;
+    oc.height = video.videoHeight;
     oc.getContext('2d').drawImage(video, 0, 0);
     const dataURL = oc.toDataURL('image/jpeg', 0.92);
-    setCapturedDataURL(dataURL);
-    stopStream();
-    setAiResult(null);
-    setAiLoading(true);
-    setScreen('review');
-    runAIAnalysis(dataURL);
+
+    const newPhotos = [...capturedPhotos, dataURL];
+    setCapturedPhotos(newPhotos);
+    setIsAligned(false);
+
+    const angles = currentView.captureAngles;
+    if (angles && captureStep < angles.length - 1) {
+      setCaptureStep(p => p + 1);
+      setCurrentStep(0); // reset instruction step for next angle
+    } else {
+      stopStream();
+      setAiResult(null);
+      setAiLoading(true);
+      setScreen('review');
+      runAIAnalysis(newPhotos);
+    }
   }
 
-  async function runAIAnalysis(dataURL) {
-    const base64 = dataURL.split(',')[1];
+  async function runAIAnalysis(photos) {
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: base64,
+          imageBase64: photos[0].split(',')[1],
+          imageCount: photos.length,
           viewName: currentView.name,
           steps: currentView.steps,
           checklist: currentView.checklist,
+          captureAngles: currentView.captureAngles,
         }),
       });
       const data = await res.json();
       setAiResult(data.text);
     } catch {
-      setAiResult('AI analysis unavailable. Please review manually against the protocol checklist below.');
+      setAiResult('AI analysis unavailable. Please review the captured series manually against the checklist below.');
     } finally {
       setAiLoading(false);
     }
@@ -262,7 +220,7 @@ export default function ClinicalLens() {
   function retakePhoto() { startView(currentView.id); }
 
   function acceptAndNext() {
-    if (!completedViews.includes(currentView.id)) {
+    if (currentView && !completedViews.includes(currentView.id)) {
       setCompletedViews(prev => [...prev, currentView.id]);
     }
     setScreen('selector');
@@ -271,14 +229,14 @@ export default function ClinicalLens() {
   function formatAIResult(text) {
     if (!text) return '';
     return text
-      .replace(/ASSESSMENT[:\s]*/gi, '<strong style="color:var(--accent);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">ASSESSMENT</strong><br>')
-      .replace(/CORRECT[:\s]*/gi, '<br><strong style="color:var(--accent2);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">CORRECT</strong><br>')
-      .replace(/IMPROVE[:\s]*/gi, '<br><strong style="color:var(--warn);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">IMPROVE</strong><br>')
-      .replace(/SCORE[:\s]*/gi, '<br><strong style="color:var(--text);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">SCORE</strong><br>')
+      .replace(/ASSESSMENT[:\s]*/gi, '<strong style="color:var(--accent);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">▸ ASSESSMENT</strong><br>')
+      .replace(/CORRECT[:\s]*/gi, '<br><strong style="color:var(--accent2);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">✓ CORRECT</strong><br>')
+      .replace(/IMPROVE[:\s]*/gi, '<br><strong style="color:var(--warn);font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">⚠ IMPROVE</strong><br>')
+      .replace(/SCORE[:\s]*/gi, '<br><strong style="color:#fff;font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">◉ SCORE</strong><br>')
       .replace(/\n/g, '<br>');
   }
 
-  function getScoreFromResult(text) {
+  function getScore(text) {
     if (!text) return null;
     const m = text.match(/SCORE[:\s]+([^\n]+)/i);
     if (!m) return null;
@@ -289,16 +247,18 @@ export default function ClinicalLens() {
     return { label: s, color };
   }
 
-  const progress = completedViews.length / VIEWS.length * 100;
-  const score = getScoreFromResult(aiResult);
+  const progress = VIEWS.length ? (completedViews.length / VIEWS.length) * 100 : 0;
+  const score = getScore(aiResult);
+  const angles = currentView?.captureAngles;
+  const totalAngles = angles?.length || 1;
+  const currentAngle = angles?.[captureStep];
 
   return (
     <>
       <div className="ambient-bg" />
-      {/* Flash */}
       <div className={`flash${flashActive ? ' go' : ''}`} />
 
-      {/* ══════ SPLASH ══════ */}
+      {/* ══════════════ SPLASH ══════════════ */}
       <div className={`screen${screen === 'splash' ? ' active' : ''}`} id="splash">
         <div className="logo-mark">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -311,54 +271,133 @@ export default function ClinicalLens() {
         <div className="app-title">Clinical<span>Lens</span></div>
         <div className="app-subtitle">Surgical Photography Guide</div>
         <div className="dept-tag">Plastic &amp; Reconstructive Surgery</div>
-        <button className="start-btn" onClick={() => showScreen('selector')}>Begin Session</button>
+        <div style={{fontSize:'12px', color:'rgba(255,255,255,0.35)', textAlign:'center', maxWidth:'240px', lineHeight:'1.5'}}>
+          PSS Standard — Plastic Surgery Educational Foundation
+        </div>
+        <button className="start-btn" onClick={() => setScreen('selector')}>Begin Session</button>
       </div>
 
-      {/* ══════ SELECTOR ══════ */}
+      {/* ══════════════ SELECTOR ══════════════ */}
       <div className={`screen${screen === 'selector' ? ' active' : ''}`} id="selector">
         <div className="top-bar">
-          <div className="back-btn" onClick={() => showScreen('splash')}>
+          <div className="back-btn" onClick={() => setScreen('splash')}>
             <svg viewBox="0 0 16 16"><path d="M10 13L5 8l5-5"/></svg>
           </div>
-          <h2>Select View</h2>
+          <div>
+            <h2>Select Setup</h2>
+            <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'2px'}}>
+              {completedViews.length}/{VIEWS.length} completed
+            </div>
+          </div>
+          <div style={{marginLeft:'auto', display:'flex', gap:'4px', background:'rgba(255,255,255,0.08)', padding:'4px', borderRadius:'8px', fontSize:'11px', fontWeight:'bold'}}>
+            <div style={{padding:'4px 10px', borderRadius:'4px', cursor:'pointer', background: aspectMode === '3:2' ? 'var(--accent)' : 'transparent', color: aspectMode === '3:2' ? '#000' : '#fff'}} onClick={() => setAspectMode('3:2')}>3:2</div>
+            <div style={{padding:'4px 10px', borderRadius:'4px', cursor:'pointer', background: aspectMode === '4:3' ? 'var(--accent)' : 'transparent', color: aspectMode === '4:3' ? '#000' : '#fff'}} onClick={() => setAspectMode('4:3')}>4:3</div>
+          </div>
         </div>
+
         <div className="progress-bar-wrap">
           <div className="progress-bar-track">
             <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
           </div>
         </div>
-        <div className="section-label">Facial Views — Standard Protocol</div>
+
+        <div className="section-label">Clinical Setups — PSS Standard</div>
         <div className="view-grid">
           {VIEWS.map(v => (
-            <div className="view-card" key={v.id} onClick={() => startView(v.id)}>
+            <div className="view-card" key={v.id} onClick={() => startView(v.id)} style={{ borderLeft: `5px solid ${v.color}` }}>
               <div className="view-icon">{v.icon}</div>
               <div className="view-info">
                 <div className="view-name">
-                  {v.name} {completedViews.includes(v.id) && <span style={{color:'var(--accent2)',fontSize:'12px'}}>✓</span>}
+                  <span>{v.name}</span>
+                  <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+                    {completedViews.includes(v.id) && <span style={{color:'var(--accent2)', fontSize:'16px'}}>✓</span>}
+                    <span className="badge" style={{ backgroundColor: v.color, color: '#000', fontWeight: 'bold' }}>{v.badge}</span>
+                  </div>
                 </div>
                 <div className="view-desc">{v.description}</div>
-                <span className="badge">{v.badge}</span>
+                {v.captureAngles && (
+                  <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px'}}>
+                    {v.captureAngles.length} shots required
+                  </div>
+                )}
+                <div className="view-calibration" onClick={e => e.stopPropagation()}>
+                  <div style={{fontSize:'10px', color:'rgba(255,255,255,0.4)', marginBottom:'4px', display:'flex', justifyContent:'space-between'}}>
+                    <span>Camera-to-Patient Distance</span>
+                    <span style={{color: v.color}}>{v.badge} Floor Mark</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={`e.g. "2.4m from ${v.badge} tape"`}
+                    value={distances[v.id] || ''}
+                    onChange={e => updateDistance(v.id, e.target.value)}
+                    style={{
+                      width:'100%', background:'rgba(0,0,0,0.25)',
+                      border:`1px solid ${distances[v.id] ? v.color : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius:'6px', padding:'6px 10px', color:'#fff',
+                      fontSize:'12px', fontFamily:'"DM Mono", monospace', outline:'none'
+                    }}
+                  />
+                </div>
               </div>
               <div className="view-arrow">›</div>
             </div>
           ))}
         </div>
+
+        {/* Expert Clinical Protocols */}
+        <div className="section-label" style={{marginTop:'24px'}}>PSS Quick Reference</div>
+        <div style={{padding:'0 24px 60px'}}>
+          <div style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'20px', padding:'20px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+            {[
+              {n:'1', t:'BACKDROP', d:'Solid-colored non-reflective backdrop. Medium blue or gray preferred.'},
+              {n:'2', t:'DISTRACTIONS', d:'Remove all jewelry and clothing from interest area. Use modesty garments.'},
+              {n:'3', t:'LIGHTING', d:'Balanced cross-lighting flash systems. No ambient room lighting.'},
+              {n:'4', t:'RECORDING', d:'Record all camera settings for each patient. Reference during post-op.'},
+            ].map(tip => (
+              <div key={tip.n}>
+                <div style={{fontSize:'11px', fontWeight:'700', color:'var(--accent)', marginBottom:'4px', letterSpacing:'1px'}}>{tip.n}. {tip.t}</div>
+                <div style={{fontSize:'11px', lineHeight:'1.5', opacity:0.6}}>{tip.d}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ══════ CAMERA ══════ */}
+      {/* ══════════════ CAMERA ══════════════ */}
       <div className={`screen${screen === 'camera' ? ' active' : ''}`} id="camera-screen">
         <video ref={videoRef} id="video" autoPlay playsInline muted />
         <canvas ref={canvasRef} id="canvas-overlay" />
 
+        {/* Top HUD */}
         <div className="cam-top">
-          <div className="cam-view-label">{currentView?.name || 'Camera'}</div>
-          <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-            <div className="cam-switch" style={{fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => {
-              setSpeechEnabled(prev => !prev);
-              if (speechEnabled && synth) synth.cancel();
-            }} title="Toggle Voice Assistant">
-              {speechEnabled ? '🔊' : '🔇'}
+          <div className="cam-view-label">
+            <div style={{fontWeight:'800', fontSize:'14px'}}>{currentView?.name || 'Camera'}</div>
+            <div style={{fontSize:'11px', color: isAligned ? '#ffde40' : 'var(--accent)', fontWeight:'bold', marginTop:'3px', transition:'color 0.3s'}}>
+              SHOT {captureStep + 1} / {totalAngles} — {currentAngle?.label || ''}
             </div>
+            {currentView && distances[currentView.id] && (
+              <div style={{fontSize:'11px', color:'rgba(255,255,255,0.6)', marginTop:'2px'}}>
+                📍 {distances[currentView.id]}
+              </div>
+            )}
+          </div>
+
+          <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+            {/* Alignment Toggle */}
+            <div
+              onClick={() => setIsAligned(p => !p)}
+              title={isAligned ? 'Aligned ✓' : 'Tap when aligned'}
+              style={{
+                width:'44px', height:'44px', borderRadius:'12px', cursor:'pointer',
+                display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px',
+                background: isAligned ? '#ffde40' : 'rgba(255,255,255,0.1)',
+                border: `1px solid ${isAligned ? '#ffde40' : 'rgba(255,255,255,0.2)'}`,
+                transition:'all 0.3s', backdropFilter:'blur(20px)',
+              }}
+            >
+              {isAligned ? '✅' : '📐'}
+            </div>
+
             {hasMultipleCameras && (
               <div className="cam-switch" onClick={switchCamera} title="Switch camera">
                 <svg viewBox="0 0 24 24"><path d="M20 5h-3.17L15 3H9L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="13" r="4"/><path d="M17 8h.01"/></svg>
@@ -370,57 +409,97 @@ export default function ClinicalLens() {
           </div>
         </div>
 
-        {currentView && (
-          <div className="checklist-panel">
-            {currentView.checklist.map((c, i) => (
-              <div className="check-item ok" key={i}>
-                <div className="check-dot" />
-                <div className="check-label">{c.label} — {c.hint}</div>
-                <div className="check-value">{c.target}</div>
-              </div>
+        {/* Aligned Banner */}
+        {isAligned && (
+          <div style={{position:'absolute', top:'105px', left:'50%', transform:'translateX(-50%)', zIndex:15, background:'#ffde40', color:'#000', padding:'5px 18px', borderRadius:'100px', fontWeight:'800', fontSize:'11px', letterSpacing:'1px', boxShadow:'0 8px 25px rgba(0,0,0,0.5)', whiteSpace:'nowrap'}}>
+            ✓ ANGLE CONFIRMED — READY TO SHOOT
+          </div>
+        )}
+
+        {/* Shot angle instruction */}
+        {currentAngle && (
+          <div style={{position:'absolute', top:'105px', right:'24px', zIndex:15, background:'rgba(0,0,0,0.6)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'12px', padding:'8px 12px', backdropFilter:'blur(20px)', maxWidth:'160px'}}>
+            <div style={{fontSize:'10px', color:'var(--accent)', fontWeight:'700', marginBottom:'3px', letterSpacing:'1px'}}>ANGLE GUIDE</div>
+            <div style={{fontSize:'11px', lineHeight:'1.4', opacity:0.9}}>{currentAngle.instruction}</div>
+          </div>
+        )}
+
+        {/* Protocol Instruction Box */}
+        {showInstructions && currentView && (
+          <div className="instruction-box show">
+            <div className="instr-step">PROTOCOL — STEP {currentStep + 1} / {currentView.steps.length}</div>
+            <div style={{fontSize:'14px', lineHeight:'1.6'}}>{currentView.steps[currentStep]}</div>
+            {currentStep < currentView.steps.length - 1 && (
+              <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px'}}>Tap › for next step</div>
+            )}
+          </div>
+        )}
+
+        {/* Bottom Controls */}
+        <div className="cam-bottom">
+          <div className="hint-btn" onClick={toggleInstructions} title="Toggle protocol steps">💡</div>
+          <div className={`shutter${flashActive ? ' capturing' : ''}`} onClick={capturePhoto}>
+            <div className="shutter-inner" />
+          </div>
+          <div className="hint-btn" onClick={nextStep} title="Next protocol step">›</div>
+        </div>
+
+        {/* Shot progress dots */}
+        {totalAngles > 1 && (
+          <div style={{position:'absolute', bottom:'160px', left:'50%', transform:'translateX(-50%)', display:'flex', gap:'8px', zIndex:10}}>
+            {Array.from({length: totalAngles}).map((_, i) => (
+              <div key={i} style={{
+                width:'8px', height:'8px', borderRadius:'50%',
+                background: i < capturedPhotos.length ? 'var(--accent2)' : i === captureStep ? '#fff' : 'rgba(255,255,255,0.3)',
+                transition:'all 0.3s',
+                boxShadow: i === captureStep ? '0 0 10px rgba(255,255,255,0.8)' : 'none'
+              }} />
             ))}
           </div>
         )}
-
-        {showInstructions && currentView && (
-          <div className="instruction-box show">
-            <div className="instr-step">STEP {currentStep + 1} OF {currentView.steps.length}</div>
-            <div>{currentView.steps[currentStep]}</div>
-          </div>
-        )}
-
-        <div className="cam-bottom">
-          <div className="hint-btn" onClick={toggleInstructions} title="Show instructions">💡</div>
-          <div className="shutter" onClick={capturePhoto}>
-            <div className="shutter-inner" />
-          </div>
-          <div className="hint-btn" onClick={nextStep} title="Next step">›</div>
-        </div>
       </div>
 
-      {/* ══════ REVIEW ══════ */}
+      {/* ══════════════ REVIEW ══════════════ */}
       <div className={`screen${screen === 'review' ? ' active' : ''}`} id="review-screen">
-        <div className="review-img-wrap">
-          {capturedDataURL && <img src={capturedDataURL} alt="captured photo" />}
-          <div className="review-tag">{currentView?.name || ''}</div>
-        </div>
-        <div className="review-body">
-          <div>
-            <div className="review-title">Photo Review</div>
-            <div className="review-subtitle">AI analysis — {currentView?.name || ''}</div>
+        <div className="top-bar" style={{paddingBottom:'10px'}}>
+          <div className="back-btn" onClick={() => setScreen('selector')}>
+            <svg viewBox="0 0 16 16"><path d="M10 13L5 8l5-5"/></svg>
           </div>
+          <div>
+            <h2 style={{fontSize:'20px'}}>Photo Review</h2>
+            <div style={{fontSize:'12px', color:'var(--text-muted)'}}>{currentView?.name}</div>
+          </div>
+          <button className="action-btn secondary" onClick={retakePhoto} style={{marginLeft:'auto', padding:'10px 16px', fontSize:'13px', borderRadius:'12px', flex:'none'}}>
+            ↺ Retake
+          </button>
+        </div>
+
+        {/* Captured photos strip */}
+        <div style={{display:'flex', gap:'12px', padding:'0 24px 16px', overflowX:'auto', flexShrink:0}}>
+          {capturedPhotos.map((p, i) => (
+            <div key={i} style={{position:'relative', flexShrink:0, width:'120px', borderRadius:'16px', overflow:'hidden', border:'1px solid rgba(255,255,255,0.1)'}}>
+              <img src={p} alt={`shot ${i+1}`} style={{width:'100%', display:'block'}} />
+              <div style={{position:'absolute', bottom:'6px', left:'6px', background:'rgba(0,0,0,0.7)', borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:'600', color:i < capturedPhotos.length ? 'var(--accent2)' : '#fff'}}>
+                {currentView?.captureAngles?.[i]?.label || `Shot ${i+1}`}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="review-body" style={{flex:1, overflowY:'auto', padding:'0 24px 100px'}}>
+          {/* AI Box */}
           <div className="ai-box">
             <div className="ai-box-header">
               <div className="ai-icon">🔬</div>
               <div>
-                <div className="ai-label">AI Assessment</div>
-                <div className="ai-sublabel">Powered by Claude</div>
+                <div className="ai-label">AI Clinical Assessment</div>
+                <div className="ai-sublabel">{capturedPhotos.length} shot{capturedPhotos.length !== 1 ? 's' : ''} analyzed · Powered by Claude</div>
               </div>
             </div>
             {aiLoading ? (
               <div className="ai-content loading">
                 <span className="ai-spinner" />
-                Analysing photograph against clinical photography standards...
+                Analysing against PSS Clinical Photography Standards...
               </div>
             ) : (
               <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatAIResult(aiResult) }} />
@@ -432,22 +511,28 @@ export default function ClinicalLens() {
               </div>
             )}
           </div>
-          <div className="action-row">
-            <button className="action-btn secondary" onClick={retakePhoto}>↺ Retake</button>
-            <button className="action-btn primary" onClick={acceptAndNext}>Accept →</button>
-          </div>
-          <div className="divider" />
+
+          {/* Protocol Checklist */}
           {currentView && (
             <div className="tips-section">
               <div className="tips-title">PROTOCOL CHECKLIST</div>
               {currentView.checklist.map((c, i) => (
                 <div className="tip-item" key={i}>
                   <div className="tip-num">0{i + 1}</div>
-                  <div>{c.label}: {c.hint} <span style={{color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontSize:'11px'}}>[{c.target}]</span></div>
+                  <div>
+                    <strong>{c.label}</strong> — {c.hint}
+                    <span style={{color:'var(--accent)', fontFamily:"'DM Mono',monospace", fontSize:'11px', marginLeft:'8px'}}>[{c.target}]</span>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+
+          {/* Action Buttons */}
+          <div className="action-row" style={{marginTop:'24px'}}>
+            <button className="action-btn secondary" onClick={retakePhoto}>↺ Retake All</button>
+            <button className="action-btn primary" onClick={acceptAndNext}>Accept & Continue →</button>
+          </div>
         </div>
       </div>
     </>

@@ -1,245 +1,220 @@
 // ══════════════════════════════════════════════
 // ClinicalLens — Views & Protocol Data
-// Verified completely and strictly against the PSS Photography Book Standards (Pages 4-8)
+// Grouped into the 6 Standard Target Areas / Ratios
 // ══════════════════════════════════════════════
 
 export const VIEWS = [
   {
-    id: 'full-face',
-    name: 'Full Face',
+    id: 'setup-1-10-v',
+    name: '1:10 Vertical (24x36cm)',
     icon: '👤',
-    description: 'Target: 24x36cm (vertical) | Ratio: 1:10',
-    badge: 'FACE',
+    description: 'Full Face, Ears (Anterior/Posterior)',
+    badge: 'YELLOW',
+    color: '#ffde40',
+    ratio: '2:3',
+    orientation: 'vertical',
+    framing: [
+      { edge: 'center-v', type: 'dotted' },
+      { edge: 'center-h', type: 'dotted' },
+      { edge: 'quarter-v-left', type: 'dotted' },
+      { edge: 'quarter-v-right', type: 'dotted' }
+    ],
     steps: [
-      'Patient Preparation: Pull hair off face and behind ears using a black headband or small clips. Remove jewelry, eyeglasses, and heavy makeup. Cover shirt collar with a black drape.',
-      'Patient Positioning: Seat patient on a stool adjusted to a comfortable height at the center of a tape mark pattern. Patient should sit up straight with feet on either side of the tape mark.',
-      'When turning for oblique and lateral views, ensure the patient rotates their entire body, including shoulders and feet.',
-      'Camera Angle & Framing: You should center ears vertically in all views.',
-      'For frontal and oblique views, center the entire head horizontally.',
-      'For lateral views, point your camera to place the front of face 1/4 frame from the edge.'
+      'Target Area: 24x36cm (vertical) at 1:10 ratio.',
+      'Framing: Center ears vertically in all views.',
+      'Frontal/Oblique: Center entire head horizontally.',
+      'Lateral: Place front of face 1/4 frame from edge (DOTTED LINE).'
+    ],
+    captureAngles: [
+      { label: 'Frontal View', instruction: 'Align nose with vertical center.' },
+      { label: 'Left Oblique', instruction: 'Rotate 45°. Align distal ear edge.' },
+      { label: 'Right Oblique', instruction: 'Rotate 45°. Align distal ear edge.' },
+      { label: 'Lateral View', instruction: 'Face front edge 1/4 from frame.' }
     ],
     checklist: [
       { label: 'Target Area', hint: 'Vertical framing', target: '24x36cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:10' },
-      { label: 'Framing (Frontal/Oblique)', hint: 'Head centered horizontally', target: 'Centered' },
-      { label: 'Framing (Vertical)', hint: 'Ears centered vertically', target: 'Ears Centered' }
+      { label: 'Ratio', hint: 'Reproduction ratio', target: '1:10' },
+      { label: 'Prep', hint: 'Hair back, jewelry removed', target: 'Done' }
     ]
   },
   {
-    id: 'close-up-face',
-    name: 'Close-up Face',
+    id: 'setup-1-4-h',
+    name: '1:4 Horizontal (15x10cm)',
     icon: '🔍',
-    description: 'Target: 15x10cm (horizontal) | Ratio: 1:4',
-    badge: 'FACE',
+    description: 'Close-up Face, Mouth, Finger',
+    badge: 'GREEN',
+    color: '#00a650',
+    ratio: '3:2',
+    orientation: 'horizontal',
+    framing: [
+      { edge: 'top', type: 'yellow', label: 'EYEBROWS' },
+      { edge: 'left', type: 'yellow', label: 'MCP JOINT' },
+      { edge: 'right', type: 'yellow', label: 'MCP JOINT' },
+      { edge: 'center-v', type: 'dotted' },
+      { edge: 'center-h', type: 'dotted' },
+      { edge: 'quarter-v-left', type: 'dotted' },
+      { edge: 'quarter-v-right', type: 'dotted' }
+    ],
     steps: [
-      'Patient Preparation: Pull hair off face and behind ears, remove jewelry and eyeglasses, remove heavy makeup, and cover shirt collar with a black drape.',
-      'Patient Positioning: Seat patient on a stool, sitting up straight. For oblique and lateral views, the patient should rotate their entire body.',
-      'Camera Angle & Framing: You should place eyebrows (or proximal eyebrow) at the top of the frame.',
-      'You should center the nose horizontally in all views.',
-      'Special Note: For a basal view, point your camera so the tip of the nose is aligned with the upper eyelid crease.'
+      'Target Area: 15x10cm (horizontal) at 1:4 ratio.',
+      'Positioning: Rotate ENTIRE body for oblique/lateral views.',
+      '--- CLOSE-UP FACE ---',
+      'Preparation: Pull hair back. Remove jewelry/heavy makeup.',
+      'Framing: Eyebrows at top. Center nose horizontally.',
+      '--- MOUTH ---',
+      'Framing: Center vertically. Lateral: lips 1/4 from edge.',
+      '--- FINGER ---',
+      'Framing: MCP joint at edge. Center finger vertically.'
+    ],
+    captureAngles: [
+      { label: 'Anterior / Frontal', instruction: 'Align center landmarks.' },
+      { label: 'Oblique / 45°', instruction: 'Maintain 1:4 ratio carefully.' },
+      { label: 'Lateral / Profile', instruction: 'Use 1/4 frame offset markers.' }
     ],
     checklist: [
       { label: 'Target Area', hint: 'Horizontal framing', target: '15x10cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:4' },
-      { label: 'Top Edge', hint: 'Framing reference', target: 'Eyebrows' },
-      { label: 'Centering', hint: 'Nose horizontally', target: 'Centered' }
+      { label: 'Ratio', hint: 'Reproduction ratio', target: '1:4' },
+      { label: 'Framing', hint: 'Follow precise edge alignment', target: 'Aligned' }
     ]
   },
   {
-    id: 'ears',
-    name: 'Ears',
+    id: 'setup-1-4-v',
+    name: '1:4 Vertical (10x15cm)',
     icon: '👂',
-    description: 'Target: 24x36cm or 10x15cm (vertical)',
-    badge: 'FACE',
+    description: 'Ears (Close-up)',
+    badge: 'GREEN',
+    color: '#00a650',
+    ratio: '2:3',
+    orientation: 'vertical',
+    framing: [
+      { edge: 'center-v', type: 'dotted' },
+      { edge: 'center-h', type: 'dotted' }
+    ],
     steps: [
-      'Patient Preparation: Pull hair completely off the face and behind ears. Remove jewelry and eyeglasses.',
-      'Patient Positioning: Seat the patient on a stool, sitting up straight. Rotate their entire body for oblique and lateral views.',
-      'Camera Angle & Framing: For anterior and posterior views, center the ears vertically and center the entire head horizontally.',
-      'For a close-up, you should center the ear exactly in the frame.',
-      'Make sure hair is completely off of the ears in all views.'
+      'Target Area: 10x15cm (vertical) at 1:4 ratio.',
+      'Preparation: Pull hair completely off of ears.',
+      'Positioning: Seat patient on stool at center tape mark. Sit straight.',
+      'Framing: Center ear both horizontally and vertically in frame.',
+      'Special Notes: Hair must be completely clear of ears in all views.'
+    ],
+    captureAngles: [
+      { label: 'Anterior View', instruction: 'Full face toward camera. Center ear.' },
+      { label: 'Lateral Profile', instruction: 'Face 90° to camera. Center ear.' },
+      { label: 'Posterior View', instruction: 'Patient faces away. Center ear.' }
     ],
     checklist: [
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:10 or 1:4' },
-      { label: 'Hair', hint: 'Hair off ears completely', target: 'Clear' },
-      { label: 'Framing (Close-up)', hint: 'Ear position', target: 'Centered' }
+      { label: 'Target Area', hint: 'Vertical framing', target: '10x15cm' },
+      { label: 'Ratio', hint: 'Reproduction ratio', target: '1:4' },
+      { label: 'Hair', hint: 'Hair off ears completely', target: 'Clear' }
     ]
   },
   {
-    id: 'mouth',
-    name: 'Mouth',
-    icon: '👄',
-    description: 'Target: 15x10cm (horizontal) | Ratio: 1:4',
-    badge: 'FACE',
-    steps: [
-      'Patient Preparation: Pull hair off face, remove lipstick and other makeup, remove any distracting jewelry, and cover shirt collar with a black drape.',
-      'Patient Positioning: Seat the patient on a stool, sitting up straight.',
-      'Camera Angle & Framing: You should center the mouth vertically in all views.',
-      'In anterior views, you should center the mouth horizontally.',
-      'In oblique and lateral views, you should position the lips 1/4 frame from the edge.',
-      'For intraoral photographs, use flash heads positioned close to the end of the lens.'
-    ],
-    checklist: [
-      { label: 'Target Area', hint: 'Horizontal framing', target: '15x10cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:4' },
-      { label: 'Vertical Framing', hint: 'Mouth position', target: 'Centered' },
-      { label: 'Lips (Lateral)', hint: '1/4 frame from edge', target: '1/4 Frame' }
-    ]
-  },
-  {
-    id: 'tram',
-    name: 'TRAM',
+    id: 'setup-1-18-v',
+    name: '1:18 Vertical (42x63cm)',
     icon: '🧍‍♀️',
-    description: 'Target: 42x63cm (vertical) | Ratio: 1:18',
-    badge: 'BODY',
+    description: 'TRAM, Hips/Thighs, Calves/Feet',
+    badge: 'ORANGE',
+    color: '#f5833c',
+    ratio: '2:3',
+    orientation: 'vertical',
+    framing: [
+      { edge: 'top', type: 'yellow', label: 'CLAVICLES' },
+      { edge: 'bottom', type: 'yellow', label: 'KNEES / TOES' },
+      { edge: 'center-v', type: 'dotted' }
+    ],
     steps: [
-      'Patient Preparation: Remove any visible jewelry. Remove gown completely. Patient should wear a photo garment.',
-      'Patient Positioning: Have the patient stand comfortably erect with arms at their sides and feet aligned with tape marks.',
-      'For oblique views, ask the patient to move their distal arm back slightly.',
-      'Camera Angle & Framing: You should position the clavicles exactly at the top of the frame.',
-      'For frontal and oblique views, center the torso horizontally.',
-      'For lateral views, center the mass of the proximal breast horizontally. Ensure the distal breast is not visible.'
+      'Target Area: 42x63cm (vertical) at 1:18 ratio.',
+      'Positioning: Stand erect. (Oblique: distal arm back).',
+      'Framing (TRAM): Clavicles at TOP of frame.',
+      'Framing (Lower): Knees/Toes at BOTTOM of frame.'
+    ],
+    captureAngles: [
+      { label: 'Anterior View', instruction: 'Feet on tape marks. Erect posture.' },
+      { label: 'Left Oblique', instruction: 'Rotate patient. Distal arm back.' },
+      { label: 'Right Oblique', instruction: 'Rotate patient. Distal arm back.' },
+      { label: 'Lateral Profile', instruction: 'Distal leg/breast must be hidden.' },
+      { label: 'Posterior View', instruction: 'Stand facing away from camera.' }
     ],
     checklist: [
       { label: 'Target Area', hint: 'Vertical framing', target: '42x63cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:18' },
-      { label: 'Top Edge', hint: 'Framing reference', target: 'Clavicles' },
-      { label: 'Lateral View', hint: 'Distal breast hidden', target: 'Hidden' }
+      { label: 'Ratio', hint: 'Reproduction ratio', target: '1:18' },
+      { label: 'Lateral', hint: 'Distal parts hidden', target: 'Hidden' }
     ]
   },
   {
-    id: 'breasts',
-    name: 'Breasts',
+    id: 'setup-1-12-h',
+    name: '1:12 Horizontal (45x30cm)',
     icon: '👙',
-    description: 'Target: 45x30cm (horizontal) | Ratio: 1:12',
-    badge: 'BODY',
+    description: 'Breasts, Abdomen, Forearm',
+    badge: 'PINK',
+    color: '#d1204e',
+    ratio: '3:2',
+    orientation: 'horizontal',
+    framing: [
+      { edge: 'top', type: 'yellow', label: 'CLAVICLES / IMF' },
+      { edge: 'left', type: 'yellow', label: 'ELBOW' },
+      { edge: 'right', type: 'yellow', label: 'ELBOW' },
+      { edge: 'center-v', type: 'dotted' }
+    ],
     steps: [
-      'Patient Preparation: Patient should be disrobed above the waist. Remove any visible jewelry.',
-      'Patient Positioning: Have the patient stand comfortably erect with arms at their sides.',
-      'Camera Angle & Framing: You should position the clavicles exactly at the top of the frame.',
-      'For frontal and oblique views, center the torso horizontally.',
-      'For lateral views, center the mass of the proximal breast horizontally. Ensure the distal breast is not visible.'
+      'Target Area: 45x30cm (horizontal) at 1:12 ratio.',
+      '--- BREASTS ---',
+      'Preparation: Disrobed above waist. Remove all visible jewelry.',
+      'Positioning (Frontal): Stand erect, arms at sides. Feet on tape marks.',
+      'Positioning (Oblique): Distal arm should be moved back slightly.',
+      'Framing: Clavicles at TOP of frame (YELLOW LINE). Center torso horizontally.',
+      'Lateral Framing: Center mass of proximal breast. Distal breast NOT visible.',
+      '--- ABDOMEN ---',
+      'Preparation: Remove gown completely. Wear photo garment.',
+      'Positioning: Stand erect, arms folded above breasts. Feet on tape marks.',
+      'Framing: Inframammary fold at TOP of frame (YELLOW LINE). Center torso.',
+      '--- FOREARM ---',
+      'Preparation: Remove wrist/finger jewelry. Remove nail polish.',
+      'Positioning: Seat on stool next to tape mark. Extend hand horizontally.',
+      'Framing: Elbow at RIGHT edge of frame (YELLOW LINE). Center forearm vertically.'
+    ],
+    captureAngles: [
+      { label: 'Anterior / Frontal', instruction: 'Align top landmarks to yellow line.' },
+      { label: 'Oblique / Lateral', instruction: 'Check distal markers carefully.' }
     ],
     checklist: [
       { label: 'Target Area', hint: 'Horizontal framing', target: '45x30cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:12' },
-      { label: 'Top Edge', hint: 'Framing reference', target: 'Clavicles' },
-      { label: 'Lateral View', hint: 'Distal breast hidden', target: 'Hidden' }
+      { label: 'Ratio', hint: 'Reproduction ratio', target: '1:12' },
+      { label: 'Top Edge', hint: 'Follow precise edge alignment', target: 'Aligned' }
     ]
   },
   {
-    id: 'abdomen',
-    name: 'Abdomen',
-    icon: '🤰',
-    description: 'Target: 45x30cm (horizontal) | Ratio: 1:12',
-    badge: 'BODY',
-    steps: [
-      'Patient Preparation: Remove gown completely. Patient should wear a photo garment.',
-      'Patient Positioning: Have the patient stand comfortably erect with arms folded above their breasts. Feet should be aligned with tape marks.',
-      'Camera Angle & Framing: You should position the inframammary fold exactly at the top of the frame.',
-      'Point your camera to center the torso horizontally.'
-    ],
-    checklist: [
-      { label: 'Target Area', hint: 'Horizontal framing', target: '45x30cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:12' },
-      { label: 'Top Edge', hint: 'Framing reference', target: 'Inframammary fold' },
-      { label: 'Arms', hint: 'Arm position', target: 'Folded above breasts' }
-    ]
-  },
-  {
-    id: 'hips-thighs',
-    name: 'Hips / Thighs',
-    icon: '🦵',
-    description: 'Target: 42x63cm (vertical) | Ratio: 1:18',
-    badge: 'LOWER BODY',
-    steps: [
-      'Patient Preparation: Remove gown completely. Patient should wear a photo garment.',
-      'Patient Positioning: Have the patient stand comfortably erect with arms folded above their breasts.',
-      'Feet should be at approximately shoulder width, aligned with tape marks.',
-      'Camera Angle & Framing: You should position the knees exactly at the bottom of the frame.',
-      'Center the hips horizontally. For lateral views, ensure the distal leg is not visible.'
-    ],
-    checklist: [
-      { label: 'Target Area', hint: 'Vertical framing', target: '42x63cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:18' },
-      { label: 'Bottom Edge', hint: 'Framing reference', target: 'Knees' },
-      { label: 'Lateral View', hint: 'Distal leg hidden', target: 'Hidden' }
-    ]
-  },
-  {
-    id: 'calves-feet',
-    name: 'Calves / Feet',
-    icon: '🦶',
-    description: 'Target: 42x63cm (vertical) | Ratio: 1:18',
-    badge: 'LOWER BODY',
-    steps: [
-      'Patient Preparation: Patient disrobed below the waist. Remove any jewelry from ankles or toes, and remove nail polish.',
-      'Patient Positioning: Patient should stand on a step stage with feet at approximately shoulder width.',
-      'Camera Angle & Framing: You should position the toes exactly at the bottom of the frame.',
-      'Point your camera to center the feet horizontally. For lateral views, ensure the distal leg is not visible.'
-    ],
-    checklist: [
-      { label: 'Target Area', hint: 'Vertical framing', target: '42x63cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:18' },
-      { label: 'Bottom Edge', hint: 'Framing reference', target: 'Toes' },
-      { label: 'Prep', hint: 'Ankle/toe jewelry, polish', target: 'Removed' }
-    ]
-  },
-  {
-    id: 'forearm',
-    name: 'Forearm',
-    icon: '💪',
-    description: 'Target: 45x30cm (horizontal) | Ratio: 1:12',
-    badge: 'EXTREMITIES',
-    steps: [
-      'Patient Preparation: Remove any jewelry from the wrist or fingers. Remove nail polish.',
-      'Patient Positioning: Seat the patient on a stool adjusted to a comfortable height next to a tape mark pattern.',
-      'Patient should extend their hand horizontally above tape marks that are perpendicular to the camera axis.',
-      'Camera Angle & Framing: You should place the elbow exactly at the edge of the frame.',
-      'Point your camera to center the forearm vertically.'
-    ],
-    checklist: [
-      { label: 'Target Area', hint: 'Horizontal framing', target: '45x30cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:12' },
-      { label: 'Edge reference', hint: 'Framing edge', target: 'Elbow' },
-      { label: 'Centering', hint: 'Forearm vertically', target: 'Centered' }
-    ]
-  },
-  {
-    id: 'hand',
-    name: 'Hand',
+    id: 'setup-1-10-h',
+    name: '1:10 Horizontal (36x24cm)',
     icon: '🖐️',
-    description: 'Target: 36x24cm (horizontal) | Ratio: 1:10',
-    badge: 'EXTREMITIES',
+    description: 'Bilateral Ears, Hand',
+    badge: 'YELLOW',
+    color: '#ffde40',
+    ratio: '3:2',
+    orientation: 'horizontal',
+    framing: [
+      { edge: 'center-v', type: 'dotted' },
+      { edge: 'center-h', type: 'dotted' }
+    ],
     steps: [
-      'Patient Preparation: Remove any jewelry from the wrist or fingers. Remove nail polish.',
-      'Patient Positioning: Seat the patient on a stool next to a tape mark pattern.',
-      'Patient should extend their hand horizontally above tape marks that are perpendicular to the camera axis.',
-      'Camera Angle & Framing: You should center the hand exactly in the frame.'
+      'Target Area: 36x24cm (horizontal) at 1:10 ratio.',
+      '--- HAND ---',
+      'Preparation: Remove jewelry from wrist/fingers. Remove nail polish.',
+      'Positioning: Seat patient on stool next to tape mark. Extend hand horizontally above tape marks, perpendicular to camera axis.',
+      'Framing: Center hand in frame horizontally and vertically.',
+      '--- BILATERAL EARS ---',
+      'Preparation: Pull hair back. Remove distracting jewelry.',
+      'Framing: Center both ears horizontally and vertically in the frame.'
+    ],
+    captureAngles: [
+      { label: 'Anterior / Palm-Up', instruction: 'Center hand. Remove jewelry & nail polish.' },
+      { label: 'Posterior / Palm-Down', instruction: 'Center hand. Verify nail polish removed.' },
+      { label: 'Lateral View', instruction: 'Center thumb side. Check extension.' }
     ],
     checklist: [
       { label: 'Target Area', hint: 'Horizontal framing', target: '36x24cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:10' },
-      { label: 'Centering', hint: 'Hand position', target: 'Centered' },
-      { label: 'Prep', hint: 'Jewelry & nail polish', target: 'Removed' }
-    ]
-  },
-  {
-    id: 'finger',
-    name: 'Finger',
-    icon: '☝️',
-    description: 'Target: 15x10cm (horizontal) | Ratio: 1:4',
-    badge: 'EXTREMITIES',
-    steps: [
-      'Patient Preparation: Remove any jewelry from the wrist or fingers. Remove nail polish.',
-      'Patient Positioning: Seat the patient on a stool and have them extend their hand horizontally.',
-      'Camera Angle & Framing: You should place the metacarpophalangeal joint exactly at the edge of the frame.',
-      'Point your camera to center the finger vertically.'
-    ],
-    checklist: [
-      { label: 'Target Area', hint: 'Horizontal framing', target: '15x10cm' },
-      { label: 'Reproduction Ratio', hint: 'Scale', target: '1:4' },
-      { label: 'Edge reference', hint: 'Framing edge', target: 'MCP joint' },
-      { label: 'Centering', hint: 'Finger vertically', target: 'Centered' }
+      { label: 'Ratio', hint: 'Reproduction ratio', target: '1:10' },
+      { label: 'Prep', hint: 'Jewelry & nail polish removed', target: 'Removed' }
     ]
   }
 ];
