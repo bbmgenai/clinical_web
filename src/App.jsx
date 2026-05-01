@@ -12,6 +12,8 @@ export default function ClinicalLens() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [flashActive, setFlashActive] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(true);
+  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const [facingMode, setFacingMode] = useState('environment');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   const [availableCameras, setAvailableCameras] = useState([]);
@@ -21,6 +23,7 @@ export default function ClinicalLens() {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const animFrameRef = useRef(null);
+  const autoFramingTimeouts = useRef([]);
 
   // Detect available cameras on mount
   useEffect(() => {
@@ -31,6 +34,31 @@ export default function ClinicalLens() {
         setHasMultipleCameras(videoDevices.length > 1);
       }).catch(() => {});
     }
+    // Pre-load voices
+    if (synth) synth.getVoices();
+  }, [synth]);
+
+  const speakText = useCallback((text) => {
+    if (!speechEnabled || !synth) return;
+    synth.cancel(); // Stop current speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = synth.getVoices();
+    let voice = voices.find(v => 
+      v.name.includes('Samantha') || 
+      v.name.includes('Zira') || 
+      v.name.includes('Google UK English Female') || 
+      v.name.includes('Female')
+    );
+    if (!voice) voice = voices.find(v => v.name.includes('Google US English') || v.lang.includes('en'));
+    if (voice) utterance.voice = voice;
+    utterance.rate = 0.95;
+    utterance.pitch = 1.1; // Sweeter pitch
+    synth.speak(utterance);
+  }, [speechEnabled, synth]);
+
+  const clearFramingTimeouts = useCallback(() => {
+    autoFramingTimeouts.current.forEach(clearTimeout);
+    autoFramingTimeouts.current = [];
   }, []);
 
   const stopStream = useCallback(() => {
@@ -139,9 +167,18 @@ export default function ClinicalLens() {
     const view = VIEWS.find(v => v.id === viewId);
     setCurrentView(view);
     setCurrentStep(0);
-    setShowInstructions(false);
+    setShowInstructions(true);
     setScreen('camera');
-    setTimeout(() => startCamera(), 100);
+    clearFramingTimeouts();
+    setTimeout(() => {
+      startCamera();
+      speakText(`Live Assistant active. Preparing for ${view.name}.`);
+      
+      // Prototype Smart Framing Sequence
+      autoFramingTimeouts.current.push(setTimeout(() => speakText('Please move a little back.'), 4500));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText('Slightly up.'), 8000));
+      autoFramingTimeouts.current.push(setTimeout(() => speakText("Stop it, it's perfect. Keep this angle for scan."), 11500));
+    }, 400);
   }
 
   function switchCamera() {
@@ -161,6 +198,8 @@ export default function ClinicalLens() {
 
   function closeCamera() {
     stopStream();
+    clearFramingTimeouts();
+    if (synth) synth.cancel();
     setScreen('selector');
   }
 
@@ -170,13 +209,17 @@ export default function ClinicalLens() {
 
   function nextStep() {
     if (!currentView) return;
-    setCurrentStep(prev => (prev + 1) % currentView.steps.length);
+    const next = (currentStep + 1) % currentView.steps.length;
+    setCurrentStep(next);
     if (!showInstructions) setShowInstructions(true);
+    speakText(`Step ${next + 1}. ${currentView.steps[next]}`);
   }
 
   function capturePhoto() {
     const video = videoRef.current;
     if (!video) return;
+    clearFramingTimeouts();
+    if (synth) synth.cancel();
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 80);
     const oc = document.createElement('canvas');
@@ -308,6 +351,12 @@ export default function ClinicalLens() {
         <div className="cam-top">
           <div className="cam-view-label">{currentView?.name || 'Camera'}</div>
           <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+            <div className="cam-switch" style={{fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => {
+              setSpeechEnabled(prev => !prev);
+              if (speechEnabled && synth) synth.cancel();
+            }} title="Toggle Voice Assistant">
+              {speechEnabled ? '🔊' : '🔇'}
+            </div>
             {hasMultipleCameras && (
               <div className="cam-switch" onClick={switchCamera} title="Switch camera">
                 <svg viewBox="0 0 24 24"><path d="M20 5h-3.17L15 3H9L7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="13" r="4"/><path d="M17 8h.01"/></svg>

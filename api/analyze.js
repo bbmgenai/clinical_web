@@ -20,20 +20,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    const prompt = `You are an expert in clinical plastic surgery photography. Analyse this photograph taken for a "${viewName}" clinical photography session.
+    const prompt = `You are a strict, world-class expert in clinical plastic surgery photography following the Photographic Standards exactly. Analyze this photograph taken for a "${viewName}" clinical photography session.
 
-Protocol requirements for this view:
+Protocol requirements for this view (MUST BE FOLLOWED WITH ABSOLUTE PRECISION):
 ${steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
-Checklist items: ${checklist.map(c => `${c.label} (${c.hint})`).join(', ')}
+Checklist items: ${checklist.map(c => `${c.label} (${c.hint}) - TARGET: ${c.target}`).join(', ')}
 
 Please provide:
-1. A brief overall quality assessment (1-2 sentences)
-2. What was done correctly (list 2-3 things)
-3. What needs improvement (list 1-3 specific issues if any)
+1. A brief overall quality assessment (1-2 sentences), emphasizing exact precision.
+2. What was done correctly (list 2-3 things).
+3. What MUST be corrected (list specific, actionable errors based exactly on the requirements above. If framing, ratio, centering, or patient prep is off, state it strictly).
 4. An overall quality score: Excellent / Good / Acceptable / Needs Retake
 
-Keep the tone professional and concise — this is for a surgical resident. Format as plain text with clear sections labelled: ASSESSMENT, CORRECT, IMPROVE, SCORE.`;
+You must insist that the photographer take the picture exactly as mentioned in the protocol. If there are deviations in jewelry, drape, makeup, ratio, centering, or framing edges, demand a retake. Keep the tone highly professional, precise, and authoritative. Format as plain text with clear sections labelled: ASSESSMENT, CORRECT, IMPROVE, SCORE.`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
